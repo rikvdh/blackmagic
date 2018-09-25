@@ -565,8 +565,10 @@ bool efm32_probe(target *t)
 
 	/* Check the idcode is silabs. See AN0062 Section 2.2 */
 	if (ap_idcode == 0x2BA01477) {
+		DEBUG("efm32 cortex-m3\n");
 		/* Cortex M3, Cortex M4 */
 	} else if (ap_idcode == 0x0BC11477) {
+		DEBUG("efm32 cortex-m0+\n");
 		/* Cortex M0+ */
 	} else {
 		return false;
@@ -575,21 +577,28 @@ bool efm32_probe(target *t)
 	/* Check the EUI is silabs. Identify the Device Identification (DI) version */
 	if (((efm32_v1_read_eui64(t) >> 40) & 0xFFFFFF) == EFM32_V1_DI_EUI_SILABS) {
 		/* Device Identification (DI) version 1 */
+		DEBUG("efm32 DIv1\n");
 		di_version = 1;
 	} else if (((efm32_v2_read_eui48(t) >> 24) & 0xFFFFFF) == EFM32_V2_DI_EUI_ENERGYMICRO) {
 		/* Device Identification (DI) version 2 */
+		DEBUG("efm32 DIv2\n");
 		di_version = 2;
 	} else {
 		/* unknown device */
-		/* sprintf(variant_string, */
-		/* 		"EFM32 DI Version ?? 0x%016llx 0x%016llx", */
-		/* 		efm32_v1_read_eui64(t), efm32_v2_read_eui48(t)); */
-		return false;
+		DEBUG("EFM32 EUI64 0x%06lx %04lx %06lx \n",
+			(uint32_t)((efm32_v1_read_eui64(t) >> 40) & 0xFFFFFF),
+			(uint32_t)((efm32_v1_read_eui64(t) >> 24) & 0xFFFF),
+			(uint32_t)((efm32_v1_read_eui64(t)) & 0xFFFFFF));
+		DEBUG("EFM32 EUI48 0x%06lx %06lx \n",
+			(uint32_t)((efm32_v2_read_eui48(t) >> 24) & 0xFFFFFF),
+			(uint32_t)((efm32_v2_read_eui48(t)) & 0xFFFFFF));
+		di_version = 1;
 	}
 
 	/* Read the part number and family */
 	uint16_t part_number = efm32_read_part_number(t, di_version);
 	size_t device_index  = efm32_lookup_device_index(t, di_version);
+	DEBUG("efm32 idx/pn: %d %d\n", device_index, part_number);
 	if (device_index > (127-32)) {
 		/* too big to encode in printable ascii */
 		return false;
