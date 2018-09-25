@@ -40,6 +40,30 @@ uint16_t led_idle_run;
 uint16_t srst_pin;
 static uint32_t rev;
 
+static void adc_init(void)
+{
+	rcc_periph_clock_enable(RCC_ADC1);
+
+	gpio_set_mode(GPIOA, GPIO_MODE_INPUT,
+			GPIO_CNF_INPUT_ANALOG, GPIO0);
+
+	adc_power_off(ADC1);
+	adc_disable_scan_mode(ADC1);
+	adc_set_single_conversion_mode(ADC1);
+	adc_disable_external_trigger_regular(ADC1);
+	adc_set_right_aligned(ADC1);
+	adc_set_sample_time_on_all_channels(ADC1, ADC_SMPR_SMP_28DOT5CYC);
+
+	adc_power_on(ADC1);
+
+	/* Wait for ADC starting up. */
+	for (int i = 0; i < 800000; i++)    /* Wait a bit. */
+		__asm__("nop");
+
+	adc_reset_calibration(ADC1);
+	adc_calibrate(ADC1);
+}
+
 int platform_hwversion(void)
 {
 	return rev;
@@ -58,6 +82,7 @@ void platform_init(void)
 		led_idle_run = GPIO8;
 		srst_pin = SRST_PIN_V1;
 	} else {
+		adc_init();
 		led_idle_run = GPIO9;
 		srst_pin = SRST_PIN_V2;
 	}
@@ -109,5 +134,22 @@ bool platform_srst_get_val()
 
 const char *platform_target_voltage(void)
 {
-	return "unknown";
+	if (platform_hwversion() == 0) {
+		return "unknown";
+	}
+
+	static char ret[] = "0.0V";
+	const uint8_t channel = 0;
+	adc_set_regular_sequence(ADC1, 1, (uint8_t*)&channel);
+
+	adc_start_conversion_direct(ADC1);
+
+	/* Wait for end of conversion. */
+	while (!adc_eoc(ADC1));
+
+	uint32_t val = adc_read_regular(ADC1);
+	ret[0] = '0' + val / 620;
+	ret[2] = '0' + (val / 62) % 10;
+
+	return ret;
 }
